@@ -282,5 +282,8 @@ describe("anchor-nftpawn", () => {
       "User NFT:",
       userNftBalanceAfter.value.amount
     );
+
+    const loan_details = (await program.account.loan.fetch(loan)).loanDetails;
+    console.log("Loan Details: ", loan_details);
   });
 });

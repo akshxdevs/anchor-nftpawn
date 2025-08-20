@@ -1,15 +1,16 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token::{self, Token},
+    token::{self, Token, Transfer},
 };
 
 declare_id!("GPCJ1xf8hidp64X5xRGUEdq171bgXoRVvBdLM7VNidoU");
 
 #[program]
 pub mod anchor_nftpawn {
+
+
     use super::*;
-    use anchor_spl::token::Transfer;
 
     pub fn initialize(ctx: Context<Initialize>, loan_amount: u64) -> Result<()> {
         let config = &mut ctx.accounts.config;
@@ -41,6 +42,7 @@ pub mod anchor_nftpawn {
         loan.amount = ctx.accounts.config.loan_amount;
         loan.active = true;
         loan.bump = ctx.bumps.loan;
+        loan.loan_details = Vec::new();
 
         Ok(())
     }
@@ -62,19 +64,38 @@ pub mod anchor_nftpawn {
                 &[&[
                     b"escrow",
                     loan.to_account_info().key.as_ref(),
-                    &[ctx.bumps.escrow_authority],                        
+                    &[ctx.bumps.escrow_authority],
                 ]],
             ),
             1_000_000_000, // Transfer 1 SOL
         )?;
+        
+        let clock = Clock::get()?;
+        
+        let details = LoanDetails {
+            loan_id: clock.unix_timestamp as u64,
+            loan_timestamp: clock.unix_timestamp,
+            lender_pubkey: ctx.accounts.config.admin,
+            borrower_pubkey: loan.borrower,
+            loan_amount: loan.amount,
+            loan_status: LoanStatus::ACTIVE,
+        };
+        
+        if loan.loan_details.is_empty() {
+            loan.loan_details = Vec::new();
+        }
+        loan.loan_details.push(details);
         Ok(())
     }
-    pub fn repay_borrower(ctx: Context<RepayBorrower>) -> Result<()> {  
+    pub fn repay_borrower(ctx: Context<RepayBorrower>) -> Result<()> {
         let loan = &mut ctx.accounts.loan;
         let fee = calc_fee(loan.amount, ctx.accounts.config.bps_fee)?;
-        let total_repay_amount = loan.amount.checked_add(fee).ok_or(CustomError::MathOverflow)?;
+        let total_repay_amount = loan
+            .amount
+            .checked_add(fee)
+            .ok_or(CustomError::MathOverflow)?;
         require!(loan.active, CustomError::LoanIsNotActive);
-        
+
         token::transfer(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
@@ -84,7 +105,7 @@ pub mod anchor_nftpawn {
                     authority: ctx.accounts.user.to_account_info(),
                 },
             ),
-            total_repay_amount,            
+            total_repay_amount,
         )?;
 
         let escrow_seeds = &[
@@ -93,7 +114,7 @@ pub mod anchor_nftpawn {
             &[ctx.bumps.escrow_authority],
         ];
         let escrow_signer = &[&escrow_seeds[..]];
-        
+
         token::transfer(
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
@@ -106,6 +127,12 @@ pub mod anchor_nftpawn {
             ),
             1, // Transfer 1 NFT
         )?;
+        
+        // Update loan status to CLOSED in loan_details
+        if let Some(last_loan_detail) = loan.loan_details.last_mut() {
+            last_loan_detail.loan_status = LoanStatus::CLOSED;
+        }
+        
         loan.active = false;
         Ok(())
     }
@@ -115,11 +142,12 @@ pub mod anchor_nftpawn {
 pub struct Config {
     pub admin: Pubkey,
     pub loan_amount: u64,
-    pub bps_fee:u64,
+    pub bps_fee: u64,
     pub bump: u8,
 }
+
 impl Config {
-    pub const SIZE: usize = 32 + 8 + 8 + 1;
+    pub const SIZE: usize = 32 + 8 + 8 + 1; // admin + loan_amount + bps_fee + bump
 }
 
 #[account]
@@ -128,10 +156,21 @@ pub struct Loan {
     pub borrower: Pubkey,
     pub amount: u64,
     pub active: bool,
+    pub loan_details: Vec<LoanDetails>,
     pub bump: u8,
 }
 impl Loan {
-    pub const SIZE: usize = 32 + 32 + 8 + 1 + 1;
+    pub const SIZE: usize = 32 + 32 + 8 + 1 + 4 + (10 * 32 + 32 + 8 + 1 + 8) + 1;
+}
+
+#[derive(AnchorDeserialize, AnchorSerialize, Clone, Debug, PartialEq)]
+pub struct LoanDetails {
+    pub loan_id: u64,
+    pub borrower_pubkey: Pubkey,
+    pub lender_pubkey: Pubkey,
+    pub loan_amount: u64,
+    pub loan_status: LoanStatus,
+    pub loan_timestamp: i64,
 }
 
 #[account]
@@ -219,6 +258,8 @@ pub struct LendBorrower<'info> {
     #[account(mut)]
     pub user_ata: AccountInfo<'info>,
     #[account(mut)]
+    pub config: Account<'info, Config>,
+    #[account(mut)]
     pub user: Signer<'info>,
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
@@ -233,7 +274,8 @@ pub struct RepayBorrower<'info> {
         mut,
         seeds = [b"escrow",loan.key().as_ref()],
         bump
-    )]    /// CHECK: PDA authority for escrow ATA
+    )]
+    /// CHECK: PDA authority for escrow ATA
     pub escrow_authority: Account<'info, Escrow>,
     /// CHECK: Escrow NFT token account
     #[account(mut)]
@@ -246,9 +288,9 @@ pub struct RepayBorrower<'info> {
     pub escrow_sol_ata: AccountInfo<'info>,
     /// CHECK: User's SOL token account
     #[account(mut)]
-    pub user_sol_ata: AccountInfo<'info>,   
+    pub user_sol_ata: AccountInfo<'info>,
     #[account(mut)]
-    pub config:Account<'info,Config>,
+    pub config: Account<'info, Config>,
     #[account(mut)]
     pub user: Signer<'info>,
     pub token_program: Program<'info, Token>,
@@ -265,6 +307,13 @@ pub enum CustomError {
     #[msg("Math overflow")]
     MathOverflow,
 }
+
+#[derive(AnchorDeserialize, AnchorSerialize, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum LoanStatus {
+    ACTIVE,
+    CLOSED,
+}
+
 fn calc_fee(amount: u64, fee_bps: u64) -> Result<u64> {
     let fee = amount
         .checked_mul(fee_bps as u64)

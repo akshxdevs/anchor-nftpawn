@@ -201,6 +201,7 @@ describe("anchor-nftpawn", () => {
       .lendBorrower()
       .accounts({
         loan: loan,
+        config: config,
         escrowAuthority: escrowAuthority,
         escrowAta: escrowSolAta,
         userAta: userSolAta,
@@ -222,6 +223,9 @@ describe("anchor-nftpawn", () => {
         " SOL, User SOL:",
       Number(userSolBalanceAfter.value.amount) / 1_000_000_000 + " SOL"
     );
+
+    const loan_details = (await program.account.loan.fetch(loan)).loanDetails;
+    console.log("Loan Details: ", loan_details);
   });
 
   it("Repay to the lender", async () => {

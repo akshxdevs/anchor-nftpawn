@@ -1,45 +1,24 @@
 # NFT Pawn DApp
 
-A decentralized NFT-backed lending platform built on Solana using Anchor framework and Next.js.
+A decentralized NFT-backed lending platform built on Solana using Anchor framework.
 
 ## Features
 
-- 🎨 **Modern UI/UX**: Beautiful, responsive design with smooth animations
-- 🔐 **Secure**: Built on Solana blockchain with Anchor framework
-- ⚡ **Fast**: Instant loan processing and NFT transfers
-- 💰 **Transparent**: All transactions are publicly verifiable
-- 🎯 **User-Friendly**: Intuitive interface for borrowing, lending, and repaying
-
-## Smart Contract Features
-
-- **NFT Deposits**: Users can deposit NFTs as collateral
-- **Instant Loans**: Get liquidity immediately against your NFTs
-- **Flexible Repayment**: Repay loans and retrieve your NFTs
-- **Interest Earning**: Lenders can earn interest on their deposits
-- **Loan History**: Complete audit trail of all loan transactions
-
-## Tech Stack
-
-### Backend
-- **Solana**: High-performance blockchain
-- **Anchor**: Framework for Solana program development
-- **Rust**: Smart contract language
-
-### Frontend
-- **Next.js 14**: React framework with App Router
-- **TypeScript**: Type-safe development
-- **Tailwind CSS**: Utility-first CSS framework
-- **Framer Motion**: Smooth animations
-- **Solana Wallet Adapter**: Wallet integration
+- **Borrow**: Deposit your NFTs and get instant SOL liquidity
+- **Lend**: Earn interest by lending SOL to NFT-backed loans
+- **Repay**: Repay your loans and get your NFTs back
+- **Secure**: All transactions are secured by Solana's blockchain
+- **Transparent**: All loan details are publicly verifiable
 
 ## Prerequisites
 
-- Node.js 18+ 
-- Rust and Cargo
+- Node.js (v16 or higher)
+- Yarn or npm
 - Solana CLI tools
 - Anchor CLI
+- A Solana wallet (Phantom, Solflare, etc.)
 
-## Installation
+## Setup
 
 1. **Clone the repository**
    ```bash
@@ -49,117 +28,126 @@ A decentralized NFT-backed lending platform built on Solana using Anchor framewo
 
 2. **Install dependencies**
    ```bash
-   npm install
+   yarn install
    ```
 
-3. **Build the smart contract**
+3. **Build the Solana program**
    ```bash
    anchor build
    ```
 
-4. **Generate TypeScript types**
+4. **Deploy the program**
    ```bash
-   anchor build
-   ```
-
-5. **Start the development server**
-   ```bash
-   npm run dev
-   ```
-
-## Smart Contract Setup
-
-1. **Configure Solana cluster**
-   ```bash
-   solana config set --url devnet
-   ```
-
-2. **Build and deploy**
-   ```bash
-   anchor build
    anchor deploy
    ```
 
-3. **Update program ID**
-   After deployment, update the program ID in:
-   - `lib/anchor.ts`
-   - `programs/anchor-nftpawn/src/lib.rs`
+5. **Initialize the program**
+   ```bash
+   anchor run deploy
+   ```
+
+6. **Start the development server**
+   ```bash
+   yarn dev
+   ```
 
 ## Usage
 
 ### For Borrowers
 
-1. **Connect Wallet**: Use Phantom or any Solana wallet
-2. **Select "Borrow" Tab**: Choose the borrow option
-3. **Enter NFT Details**: Provide your NFT mint address
-4. **Set Loan Amount**: Specify how much you want to borrow
-5. **Submit Transaction**: Confirm the loan request
+1. Connect your wallet using the "Connect Wallet" button
+2. Navigate to the "Borrow" tab
+3. Enter your NFT mint address
+4. Enter the loan amount you want to borrow
+5. Click "Borrow Now" to submit your loan request
 
 ### For Lenders
 
-1. **Connect Wallet**: Use your Solana wallet
-2. **Select "Lend" Tab**: Choose the lend option
-3. **Browse Available Loans**: View active loan requests
-4. **Fund Loan**: Provide liquidity to earn interest
-5. **Monitor Returns**: Track your earnings
+1. Connect your wallet
+2. Navigate to the "Lend" tab
+3. View available loan requests
+4. Click "Lend" on any loan you want to fund
+5. Confirm the transaction in your wallet
 
 ### For Repayment
 
-1. **Select "Repay" Tab**: Choose the repay option
-2. **View Active Loans**: See your outstanding loans
-3. **Calculate Repayment**: Check total amount due
-4. **Submit Payment**: Repay and retrieve your NFT
+1. Connect your wallet
+2. Navigate to the "Repay" tab
+3. View your active loans
+4. Click "Repay" on any loan you want to repay
+5. Confirm the transaction in your wallet
 
-## Project Structure
+## Contract Functions
 
-```
-anchor-nftpawn/
-├── app/                    # Next.js app directory
-│   ├── globals.css        # Global styles
-│   ├── layout.tsx         # Root layout
-│   └── page.tsx           # Main page
-├── lib/                   # Utility libraries
-│   └── anchor.ts          # Anchor client
-├── programs/              # Smart contracts
-│   └── anchor-nftpawn/
-│       └── src/
-│           └── lib.rs     # Main program
-├── tests/                 # Test files
-├── target/                # Build artifacts
-└── migrations/            # Deployment scripts
-```
+### `initialize(loan_amount: u64)`
+Initializes the program with a default loan amount.
 
-## Smart Contract Functions
+### `deposite()`
+Deposits an NFT and creates a loan request.
 
-### Core Functions
+### `lend_borrower()`
+Funds a loan request with SOL.
 
-- `initialize(loan_amount)`: Initialize the program with loan amount
-- `deposite()`: Deposit NFT and create loan request
-- `lend_borrower()`: Provide liquidity to active loans
-- `repay_borrower()`: Repay loan and retrieve NFT
-
-### Account Structures
-
-- **Config**: Program configuration and admin settings
-- **Loan**: Individual loan details and status
-- **LoanDetails**: Transaction history and loan metadata
-- **Escrow**: NFT and SOL escrow management
+### `repay_borrower()`
+Repays a loan and returns the NFT to the borrower.
 
 ## Development
 
-### Running Tests
+### Project Structure
+
+```
+anchor-nftpawn/
+├── app/                    # Next.js frontend
+├── components/             # React components
+├── lib/                    # Utility functions and contracts
+├── programs/               # Solana program (Rust)
+├── migrations/             # Deployment scripts
+└── tests/                  # Test files
+```
+
+### Key Files
+
+- `programs/anchor-nftpawn/src/lib.rs` - Main Solana program
+- `lib/anchor.ts` - TypeScript client for the program
+- `lib/idl.ts` - Interface definition for the program
+- `app/page.tsx` - Main application interface
+
+### Testing
+
+Run the test suite:
 ```bash
 anchor test
 ```
 
-### Building for Production
-```bash
-npm run build
-```
+## Configuration
 
-### Linting
+The application is configured to use:
+- **Network**: Devnet (for development)
+- **Program ID**: `GPCJ1xf8hidp64X5xRGUEdq171bgXoRVvBdLM7VNidoU`
+- **Default Loan Amount**: 1 SOL (1,000,000,000 lamports)
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Wallet Connection Failed**
+   - Make sure you have a Solana wallet installed
+   - Check that you're on the correct network (Devnet)
+
+2. **Transaction Failed**
+   - Ensure you have enough SOL for transaction fees
+   - Check that the NFT mint address is valid
+   - Verify you own the NFT you're trying to deposit
+
+3. **Program Not Found**
+   - Make sure the program is deployed to the correct network
+   - Verify the program ID in the configuration
+
+### Getting SOL for Testing
+
+To get devnet SOL for testing:
 ```bash
-npm run lint
+solana airdrop 2 <your-wallet-address> --url devnet
 ```
 
 ## Contributing
@@ -172,24 +160,4 @@ npm run lint
 
 ## License
 
-This project is licensed under the MIT License.
-
-## Support
-
-For support and questions:
-- Open an issue on GitHub
-- Join our Discord community
-- Check the documentation
-
-## Roadmap
-
-- [ ] Multi-chain support
-- [ ] Advanced NFT valuation
-- [ ] Liquidation mechanisms
-- [ ] Governance tokens
-- [ ] Mobile app
-- [ ] API integration
-
----
-
-Built with ❤️ on Solana 
+This project is licensed under the MIT License. 

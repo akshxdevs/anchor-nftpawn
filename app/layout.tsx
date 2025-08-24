@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { Toaster } from 'react-hot-toast'
+import WalletProviderWrapper from '../components/WalletProvider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -18,17 +19,19 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} bg-gradient-to-br from-dark-50 to-dark-100 dark:from-dark-900 dark:to-dark-800 min-h-screen`}>
-        {children}
-        <Toaster 
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: '#1e293b',
-              color: '#fff',
-            },
-          }}
-        />
+        <WalletProviderWrapper>
+          {children}
+          <Toaster 
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: '#1e293b',
+                color: '#fff',
+              },
+            }}
+          />
+        </WalletProviderWrapper>
       </body>
     </html>
   )

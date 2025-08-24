@@ -24,9 +24,6 @@ describe("anchor-nftpawn", () => {
   let escrowAta: anchor.web3.PublicKey;
   let loan: anchor.web3.PublicKey;
   let mint: anchor.web3.PublicKey;
-  let solMint: anchor.web3.PublicKey;
-  let escrowSolAta: anchor.web3.PublicKey;
-  let userSolAta: anchor.web3.PublicKey;
 
   it("Is initialized!", async () => {
     [config] = await PublicKey.findProgramAddress(
@@ -134,67 +131,16 @@ describe("anchor-nftpawn", () => {
   });
 
   it("Lend to borrower", async () => {
-    solMint = await createMint(
-      provider.connection,
-      user.payer,
-      user.publicKey,
-      null,
-      9 // SOL has 9 decimals
-    );
-
-    escrowSolAta = (
-      await getOrCreateAssociatedTokenAccount(
-        provider.connection,
-        user.payer,
-        solMint,
-        escrowAuthority,
-        true
-      )
-    ).address;
-
-    userSolAta = (
-      await getOrCreateAssociatedTokenAccount(
-        provider.connection,
-        user.payer,
-        solMint,
-        user.publicKey
-      )
-    ).address;
-
     const escrowNftBalance = await provider.connection.getTokenAccountBalance(
       escrowAta
     );
 
-    await mintTo(
-      provider.connection,
-      user.payer,
-      solMint,
-      escrowSolAta,
-      user.payer,
-      1_000_000_000 // 1 SOL
-    );
-
-    // Mint additional SOL to user for interest fee payment
-    await mintTo(
-      provider.connection,
-      user.payer,
-      solMint,
-      userSolAta,
-      user.payer,
-      10_000_000
-    );
-
-    const escrowSolBalanceBefore =
-      await provider.connection.getTokenAccountBalance(escrowSolAta);
-    const userSolBalanceBefore =
-      await provider.connection.getTokenAccountBalance(userSolAta);
+    const userSolBalanceBefore = await provider.connection.getBalance(user.publicKey);
     console.log(
       "Lend Setup - Escrow NFT:",
       escrowNftBalance.value.amount,
-      "Escrow SOL:",
-      Number(escrowSolBalanceBefore.value.amount) / 1_000_000_000 +
-        " SOL, User SOL:",
-      Number(userSolBalanceBefore.value.amount) / 1_000_000_000 + " SOL"
+      "User SOL:",
+      userSolBalanceBefore / 1_000_000_000 + " SOL"
     );
 
     const tx = await program.methods
@@ -203,25 +149,18 @@ describe("anchor-nftpawn", () => {
         loan: loan,
         config: config,
         escrowAuthority: escrowAuthority,
-        escrowAta: escrowSolAta,
-        userAta: userSolAta,
+        escrowAta: user.publicKey, // Using user's SOL account
+        userAta: user.publicKey,   // Using user's SOL account
         user: user.publicKey,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       })
       .rpc();
     console.log("Lend transaction signature", tx);
 
-    const escrowSolBalanceAfter =
-      await provider.connection.getTokenAccountBalance(escrowSolAta);
-    const userSolBalanceAfter =
-      await provider.connection.getTokenAccountBalance(userSolAta);
+    const userSolBalanceAfter = await provider.connection.getBalance(user.publicKey);
     console.log(
-      "Lend Results - Escrow SOL:",
-      Number(escrowSolBalanceAfter.value.amount) / 1_000_000_000 +
-        " SOL, User SOL:",
-      Number(userSolBalanceAfter.value.amount) / 1_000_000_000 + " SOL"
+      "Lend Results - User SOL:",
+      userSolBalanceAfter / 1_000_000_000 + " SOL"
     );
 
     const loan_details = (await program.account.loan.fetch(loan)).loanDetails;
@@ -229,19 +168,14 @@ describe("anchor-nftpawn", () => {
   });
 
   it("Repay to the lender", async () => {
-    const escrowSolBalanceBefore =
-      await provider.connection.getTokenAccountBalance(escrowSolAta);
-    const userSolBalanceBefore =
-      await provider.connection.getTokenAccountBalance(userSolAta);
+    const userSolBalanceBefore = await provider.connection.getBalance(user.publicKey);
     const escrowNftBalanceBefore =
       await provider.connection.getTokenAccountBalance(escrowAta);
     const userNftBalanceBefore =
       await provider.connection.getTokenAccountBalance(userAta);
     console.log(
-      "Repay Setup - Escrow SOL:",
-      Number(escrowSolBalanceBefore.value.amount) / 1_000_000_000 +
-        " SOL, User SOL:",
-      Number(userSolBalanceBefore.value.amount) / 1_000_000_000 +
+      "Repay Setup - User SOL:",
+      userSolBalanceBefore / 1_000_000_000 +
         " SOL, Escrow NFT:",
       escrowNftBalanceBefore.value.amount,
       "User NFT:",
@@ -255,28 +189,24 @@ describe("anchor-nftpawn", () => {
         escrowAuthority: escrowAuthority,
         escrowNftAta: escrowAta,
         userNftAta: userAta,
-        escrowSolAta: escrowSolAta,
-        userSolAta: userSolAta,
+        escrowSolAta: user.publicKey, // Using user's SOL account
+        userSolAta: user.publicKey,   // Using user's SOL account
         config: config,
         user: user.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
       })
       .rpc();
     console.log("Repay transaction signature", tx);
 
-    const escrowSolBalanceAfter =
-      await provider.connection.getTokenAccountBalance(escrowSolAta);
-    const userSolBalanceAfter =
-      await provider.connection.getTokenAccountBalance(userSolAta);
+    const userSolBalanceAfter = await provider.connection.getBalance(user.publicKey);
     const escrowNftBalanceAfter =
       await provider.connection.getTokenAccountBalance(escrowAta);
     const userNftBalanceAfter =
       await provider.connection.getTokenAccountBalance(userAta);
     console.log(
-      "Repay Results - Escrow SOL:",
-      Number(escrowSolBalanceAfter.value.amount) / 1_000_000_000 +
-        " SOL, User SOL:",
-      Number(userSolBalanceAfter.value.amount) / 1_000_000_000 +
+      "Repay Results - User SOL:",
+      userSolBalanceAfter / 1_000_000_000 +
         " SOL, Escrow NFT:",
       escrowNftBalanceAfter.value.amount,
       "User NFT:",

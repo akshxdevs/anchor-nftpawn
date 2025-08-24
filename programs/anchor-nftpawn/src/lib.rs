@@ -53,21 +53,20 @@ pub mod anchor_nftpawn {
             loan.borrower != Pubkey::default(),
             CustomError::BorrowerNotFound
         );
-        token::transfer(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.escrow_ata.to_account_info(),
-                    to: ctx.accounts.user_ata.to_account_info(),
-                    authority: ctx.accounts.escrow_authority.to_account_info(),
-                },
-                &[&[
-                    b"escrow",
-                    loan.to_account_info().key.as_ref(),
-                    &[ctx.bumps.escrow_authority],
-                ]],
-            ),
-            1_000_000_000, // Transfer 1 SOL
+        
+        // Transfer SOL from lender to borrower using system program
+        let transfer_instruction = anchor_lang::solana_program::system_instruction::transfer(
+            &ctx.accounts.user.key(),
+            &ctx.accounts.escrow_ata.key(),
+            loan.amount
+        );
+        
+        anchor_lang::solana_program::program::invoke(
+            &transfer_instruction,
+            &[
+                ctx.accounts.user.to_account_info(),
+                ctx.accounts.escrow_ata.to_account_info(),
+            ],
         )?;
         
         let clock = Clock::get()?;
@@ -75,7 +74,7 @@ pub mod anchor_nftpawn {
         let details = LoanDetails {
             loan_id: clock.unix_timestamp as u64,
             loan_timestamp: clock.unix_timestamp,
-            lender_pubkey: ctx.accounts.config.admin,
+            lender_pubkey: ctx.accounts.user.key(),
             borrower_pubkey: loan.borrower,
             loan_amount: loan.amount,
             loan_status: LoanStatus::ACTIVE,
@@ -96,16 +95,19 @@ pub mod anchor_nftpawn {
             .ok_or(CustomError::MathOverflow)?;
         require!(loan.active, CustomError::LoanIsNotActive);
 
-        token::transfer(
-            CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.user_sol_ata.to_account_info(),
-                    to: ctx.accounts.escrow_sol_ata.to_account_info(),
-                    authority: ctx.accounts.user.to_account_info(),
-                },
-            ),
-            total_repay_amount,
+        // Transfer SOL from borrower to escrow using system program
+        let transfer_instruction = anchor_lang::solana_program::system_instruction::transfer(
+            &ctx.accounts.user.key(),
+            &ctx.accounts.escrow_sol_ata.key(),
+            total_repay_amount
+        );
+        
+        anchor_lang::solana_program::program::invoke(
+            &transfer_instruction,
+            &[
+                ctx.accounts.user.to_account_info(),
+                ctx.accounts.escrow_sol_ata.to_account_info(),
+            ],
         )?;
 
         let escrow_seeds = &[
@@ -188,7 +190,7 @@ pub struct Initialize<'info> {
         init,
         seeds = [b"config",admin.key().as_ref()],
         payer = admin,
-        space = 8 + Config::SIZE,
+        space = 8 + Config::SIZE,   
         bump,
     )]
     pub config: Account<'info, Config>,
@@ -251,18 +253,16 @@ pub struct LendBorrower<'info> {
     )]
     /// CHECK: PDA authority for escrow ATA
     pub escrow_authority: Account<'info, Escrow>,
-    /// CHECK: PDA token account for escrow
+    /// CHECK: Escrow SOL account (system account)
     #[account(mut)]
     pub escrow_ata: AccountInfo<'info>,
-    /// CHECK: User's token account containing the NFT
+    /// CHECK: User's SOL account (system account)
     #[account(mut)]
     pub user_ata: AccountInfo<'info>,
     #[account(mut)]
     pub config: Account<'info, Config>,
     #[account(mut)]
     pub user: Signer<'info>,
-    pub token_program: Program<'info, Token>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
 
@@ -283,10 +283,10 @@ pub struct RepayBorrower<'info> {
     /// CHECK: User's NFT token account
     #[account(mut)]
     pub user_nft_ata: AccountInfo<'info>,
-    /// CHECK: Escrow SOL token account
+    /// CHECK: Escrow SOL account (system account)
     #[account(mut)]
     pub escrow_sol_ata: AccountInfo<'info>,
-    /// CHECK: User's SOL token account
+    /// CHECK: User's SOL account (system account)
     #[account(mut)]
     pub user_sol_ata: AccountInfo<'info>,
     #[account(mut)]
@@ -294,6 +294,7 @@ pub struct RepayBorrower<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
     pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
 }
 
 #[error_code]

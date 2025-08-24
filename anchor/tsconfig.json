@@ -16,6 +16,6 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["tests/**/*.ts"],
+  "include": ["tests/**/*.ts", "migrations/**/*.ts"],
   "exclude": ["node_modules", "target/**/*"]
 } 

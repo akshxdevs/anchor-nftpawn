@@ -3,6 +3,7 @@ import { TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddres
 import { IDL } from '../anchor/idl';
 import { WalletContextState } from '@solana/wallet-adapter-react';
 
+
 const PROGRAM_ID = new PublicKey('GPCJ1xf8hidp64X5xRGUEdq171bgXoRVvBdLM7VNidoU');
 
 export interface LoanDetails {
@@ -89,12 +90,44 @@ export class AnchorClient {
 
   async lendBorrower(loanAddress: string) {
     try {
-      if (!this.wallet.publicKey) throw new Error('Wallet not connected');
+      if (!this.wallet.publicKey || !this.wallet.signTransaction) {
+        throw new Error('Wallet not connected or cannot sign transactions');
+      }
       
       const loanPubkey = new PublicKey(loanAddress);
       
-      console.log('Lend transaction would be sent to:', loanPubkey.toString());
-      return 'mock_lend_transaction_signature';
+      // Get the loan account to find the borrower and amount
+      const loanAccount = await this.getLoan(loanPubkey);
+      if (!loanAccount.active) {
+        throw new Error('This loan is not active');
+      }
+      
+      // Create a transaction to transfer SOL to the borrower
+      const transaction = new Transaction();
+      
+      // Add transfer instruction
+      const transferInstruction = SystemProgram.transfer({
+        fromPubkey: this.wallet.publicKey,
+        toPubkey: loanAccount.borrower,
+        lamports: loanAccount.amount,
+      });
+      
+      transaction.add(transferInstruction);
+      
+      // Get recent blockhash
+      const { blockhash } = await this.connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = this.wallet.publicKey;
+      
+      // Sign and send transaction
+      const signedTx = await this.wallet.signTransaction(transaction);
+      const signature = await this.connection.sendRawTransaction(signedTx.serialize());
+      
+      // Wait for confirmation
+      await this.connection.confirmTransaction(signature, 'confirmed');
+      
+      console.log('Lend transaction completed:', signature);
+      return signature;
     } catch (error) {
       console.error('Lend error:', error);
       throw error;
@@ -150,20 +183,48 @@ export class AnchorClient {
 
   async getAllLoans(): Promise<any[]> {
     try {
-      // Mock loans data for now
-      return [
+      // Create some mock loans for demonstration
+      const mockLoans = [
         {
           publicKey: new PublicKey('11111111111111111111111111111111'),
           account: {
-            nftMint: new PublicKey('11111111111111111111111111111111'),
-            borrower: this.wallet.publicKey!,
-            amount: 1000000000,
+            nftMint: new PublicKey('22222222222222222222222222222222'),
+            borrower: new PublicKey('33333333333333333333333333333333'), // Different borrower
+            amount: 1000000000, // 1 SOL
+            active: true,
+            loanDetails: [],
+            bump: 0,
+          }
+        },
+        {
+          publicKey: new PublicKey('44444444444444444444444444444444'),
+          account: {
+            nftMint: new PublicKey('55555555555555555555555555555555'),
+            borrower: new PublicKey('66666666666666666666666666666666'), // Different borrower
+            amount: 2000000000, // 2 SOL
             active: true,
             loanDetails: [],
             bump: 0,
           }
         }
       ];
+      
+      // If user is connected, add their own loans
+      if (this.wallet.publicKey) {
+        mockLoans.push({
+          publicKey: new PublicKey('77777777777777777777777777777777'),
+          account: {
+            nftMint: new PublicKey('88888888888888888888888888888888'),
+            borrower: this.wallet.publicKey,
+            amount: 500000000, // 0.5 SOL
+            active: true,
+            loanDetails: [],
+            bump: 0,
+          }
+        });
+      }
+      
+      return mockLoans;
     } catch (error) {
       console.error('Get all loans error:', error);
       return [];

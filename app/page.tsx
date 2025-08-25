@@ -24,6 +24,7 @@ export default function Home() {
   const [loanAmount, setLoanAmount] = useState('');
   const [nftMint, setNftMint] = useState('');
   const [loading, setLoading] = useState(false);
+  const [refreshingLoans, setRefreshingLoans] = useState(false);
   const [availableLoans, setAvailableLoans] = useState<any[]>([]);
   const [userLoans, setUserLoans] = useState<any[]>([]);
 
@@ -71,7 +72,8 @@ export default function Home() {
     try {
       const loans = await anchorClient.getAllLoans();
       const userLoans = loans.filter((loan: any) => 
-        loan.account.borrower.toString() === publicKey.toString()
+        loan.account.borrower.toString() === publicKey.toString() &&
+        loan.account.active === true
       );
       setUserLoans(userLoans);
       console.log('User loans:', userLoans);
@@ -134,8 +136,14 @@ export default function Home() {
     setLoading(true);
     try {
       const tx = await anchorClient.repayBorrower(loanAddress, nftMint);
-      toast.success(`Repayment completed successfully! Transaction: ${tx}`);
-      await fetchUserLoans();
+      toast.success(`Repayment completed successfully! Transaction: ${tx}. The loan will disappear from the list shortly.`);
+      
+      // Add a small delay to ensure blockchain state is updated
+      setTimeout(async () => {
+        setRefreshingLoans(true);
+        await fetchUserLoans();
+        setRefreshingLoans(false);
+      }, 2000);
     } catch (error: any) {
       console.error('Repay error:', error);
       toast.error(error.message || 'Transaction failed. Please try again.');
@@ -437,7 +445,7 @@ export default function Home() {
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                     ) : (
                       <>
-                        <span>Check Loans</span>
+                        <span>Refresh Loans</span>
                         <ArrowRight className="w-5 h-5" />
                       </>
                     )}
